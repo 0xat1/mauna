@@ -76,13 +76,11 @@ pub mod MaunaCore {
     pub impl MaunaCore of IMaunaCore<ContractState> {
         /// Mint USDm tokens for a supported collateral
         fn mint(ref self: ContractState, order: Order) {
-            // Collateral must be whitelisted
-            assert(self.is_supported_asset(order.collateral), errors::ASSET_NOT_SUPPORTED);
-            // Deposit amount must be non-zero
-            assert(order.amount_in > 0, errors::ZERO_TOKEN_AMOUNT);
-
             let caller = get_caller_address();
             let contract = get_contract_address();
+
+            // Verify order parameters
+            self._validate_order(order);
 
             // Ensure benefactor has enough collateral
             let balance = IERC20Dispatcher { contract_address: order.collateral }
@@ -146,6 +144,23 @@ pub mod MaunaCore {
         /// Get the list of supported collateral assets
         fn get_supported_collaterals(self: @ContractState) -> Array<ContractAddress> {
             ArrayTrait::new()
+        }
+    }
+
+    #[generate_trait]
+    impl Internal of InternalTrait {
+        /// Validate basic fields of an Order struct
+        fn _validate_order(self: @ContractState, order: Order) {
+            // Benefactor must be non-zero
+            assert(order.benefactor.is_non_zero(), errors::ZERO_TOKEN_ADDRESS);
+            // Beneficiary must be non-zero
+            assert(order.beneficiary.is_non_zero(), errors::ZERO_TOKEN_ADDRESS);
+            // Collateral address must be non-zero
+            assert(order.collateral.is_non_zero(), errors::ZERO_TOKEN_ADDRESS);
+            // Collateral must be whitelisted
+            assert(self.is_supported_asset(order.collateral), errors::ASSET_NOT_SUPPORTED);
+            // Deposit amount must be non-zero
+            assert(order.amount_in > 0, errors::ZERO_TOKEN_AMOUNT);
         }
     }
 }

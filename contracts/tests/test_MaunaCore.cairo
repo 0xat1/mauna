@@ -105,10 +105,9 @@ fn test_mint_non_whitelisted_collateral() {
     IMaunaCoreDispatcher { contract_address: mauna }.mint(order);
     stop_cheat_caller_address(mauna);
 }
-//
-// #[test]
-// fn test_mint_zero_deposit_amount_panics() {}
-//
+
+#[test]
+fn test_mint_zero_amount() {}
 // #[test]
 // fn test_mint_insufficient_balance_panics() {}
 //
@@ -118,10 +117,5 @@ fn test_mint_non_whitelisted_collateral() {
 // #[test]
 // fn test_mint_slippage_exceeded_panics() {}
 //
-// #[test]
-// fn test_mint_invalid_signature_panics() {}
-//
-// #[test]
-// fn test_mint_transfer_failed_panics() {}
 
 
