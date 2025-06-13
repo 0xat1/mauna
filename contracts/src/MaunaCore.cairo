@@ -1,5 +1,6 @@
 #[starknet::contract]
 pub mod MaunaCore {
+    use core::num::traits::Zero;
     use mauna::interfaces::IMaunaCore::IMaunaCore;
     use mauna::interfaces::IUSDm::{IUSDmDispatcher, IUSDmDispatcherTrait};
     use mauna::utils::errors;
@@ -15,6 +16,7 @@ pub mod MaunaCore {
     pub enum Event {
         /// Emitted when USDm tokens are minted
         TokensMinted: TokensMinted,
+        CollateralAdded: CollateralAdded,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -25,6 +27,12 @@ pub mod MaunaCore {
         pub collateral_asset: ContractAddress,
         pub collateral_amount: u256,
         pub usdm_amount: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct CollateralAdded {
+        pub caller: ContractAddress,
+        pub asset: ContractAddress,
     }
 
     #[derive(Copy, Drop, Serde)]
@@ -114,14 +122,25 @@ pub mod MaunaCore {
         fn redeem(ref self: ContractState, order: Order) {}
 
         /// Add a new collateral asset
-        fn add_supported_asset(ref self: ContractState, asset: ContractAddress) {}
+        fn add_supported_asset(ref self: ContractState, asset: ContractAddress) {
+            // Verify asset address is not zero
+            assert(asset.is_non_zero(), errors::ZERO_TOKEN_ADDRESS);
+            // Verify asset is not already supported as collateral
+            assert(
+                !self.supported_collaterals.entry(asset).read(), errors::ASSET_ALREADY_SUPPORTED,
+            );
+
+            self.supported_collaterals.entry(asset).write(true);
+            self.collaterals.push(asset);
+            self.emit(CollateralAdded { caller: get_caller_address(), asset });
+        }
 
         /// Remove a supported collateral
         fn remove_supported_asset(ref self: ContractState, asset: ContractAddress) {}
 
         /// Check if an asset is supported as collateral
         fn is_supported_asset(self: @ContractState, asset: ContractAddress) -> bool {
-            true
+            self.supported_collaterals.entry(asset).read()
         }
 
         /// Get the list of supported collateral assets

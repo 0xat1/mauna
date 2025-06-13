@@ -6,7 +6,7 @@ use snforge_std::{
     start_cheat_caller_address, stop_cheat_caller_address,
 };
 use starknet::ContractAddress;
-use super::utils::setup;
+use super::utils::{deploy_mock_erc20, setup};
 
 #[test]
 fn test_mint_success() {
@@ -33,7 +33,7 @@ fn test_mint_success() {
         min_amount_out: usdm_amount,
     };
 
-    // Set allowance
+    // Approve MaunaCore to spend collateral
     start_cheat_caller_address(collateral, user);
     IERC20Dispatcher { contract_address: collateral }.approve(mauna, collateral_amount);
     stop_cheat_caller_address(collateral);
@@ -66,8 +66,45 @@ fn test_mint_success() {
     );
     spy.assert_emitted(@array![(mauna, event)]);
 }
-// #[test]
-// fn test_mint_non_whitelisted_collateral_panics() {}
+
+#[test]
+#[should_panic(expected: 'Asset is not supported')]
+fn test_mint_non_whitelisted_collateral() {
+    let (_, _, mauna) = setup();
+
+    let user: ContractAddress = 'user'.try_into().unwrap();
+    let unsupported_collateral = deploy_mock_erc20();
+    let collateral_amount = 10_u256;
+    let usdm_amount = 10_u256;
+
+    // Fund user wallet with an unsupported collateral token
+    let token = Token::Custom(
+        CustomToken {
+            contract_address: unsupported_collateral,
+            balances_variable_selector: selector!("ERC20_balances"),
+        },
+    );
+    set_balance(user, collateral_amount, token);
+
+    // Init order
+    let order = Order {
+        benefactor: user,
+        beneficiary: user,
+        collateral: unsupported_collateral,
+        amount_in: collateral_amount,
+        min_amount_out: usdm_amount,
+    };
+
+    // Approve MaunaCore to spend the unsupported collateral
+    start_cheat_caller_address(unsupported_collateral, user);
+    IERC20Dispatcher { contract_address: unsupported_collateral }.approve(mauna, collateral_amount);
+    stop_cheat_caller_address(unsupported_collateral);
+
+    // Attempt to mint should panic due to unsupported asset used as collateral
+    start_cheat_caller_address(mauna, user);
+    IMaunaCoreDispatcher { contract_address: mauna }.mint(order);
+    stop_cheat_caller_address(mauna);
+}
 //
 // #[test]
 // fn test_mint_zero_deposit_amount_panics() {}
