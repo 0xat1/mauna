@@ -69,7 +69,7 @@ fn test_mint_success() {
 
 #[test]
 #[should_panic(expected: 'Asset is not supported')]
-fn test_mint_non_whitelisted_collateral() {
+fn test_mint_non_supported_collateral() {
     let (_, _, mauna) = setup();
 
     let user: ContractAddress = 'user'.try_into().unwrap();
@@ -105,17 +105,25 @@ fn test_mint_non_whitelisted_collateral() {
     IMaunaCoreDispatcher { contract_address: mauna }.mint(order);
     stop_cheat_caller_address(mauna);
 }
+// #[test]
+// fn test_mint_zero_benefactor() {}
 
-#[test]
-fn test_mint_zero_amount() {}
+// #[test]
+// fn test_mint_zero_beneficiary() {}
+
+// #[test]
+// fn test_mint_zero_collateral() {}
+
+// #[test]
+// fn test_mint_zero_collateral_amount() {}
+
 // #[test]
 // fn test_mint_insufficient_balance_panics() {}
-//
+
 // #[test]
 // fn test_mint_insufficient_allowance_panics() {}
-//
+
 // #[test]
 // fn test_mint_slippage_exceeded_panics() {}
-//
 
 

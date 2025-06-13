@@ -16,6 +16,9 @@ pub mod MaunaCore {
     pub enum Event {
         /// Emitted when USDm tokens are minted
         TokensMinted: TokensMinted,
+        /// Emitted when a collateral asset is added to the whitelist
+        CollateralRemoved: CollateralRemoved,
+        /// Emitted when a validator address is removed
         CollateralAdded: CollateralAdded,
     }
 
@@ -27,6 +30,12 @@ pub mod MaunaCore {
         pub collateral_asset: ContractAddress,
         pub collateral_amount: u256,
         pub usdm_amount: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct CollateralRemoved {
+        caller: ContractAddress,
+        asset: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -134,7 +143,28 @@ pub mod MaunaCore {
         }
 
         /// Remove a supported collateral
-        fn remove_supported_asset(ref self: ContractState, asset: ContractAddress) {}
+        fn remove_supported_asset(ref self: ContractState, asset: ContractAddress) {
+            // Verify asset address is not zero
+            assert(asset.is_non_zero(), errors::ZERO_TOKEN_ADDRESS);
+            // Verify asset is supported as collateral
+            assert(self.supported_collaterals.entry(asset).read(), 'Asset not supperted');
+
+            for i in 0..self.collaterals.len() {
+                if (self.collaterals.at(i).read() == asset) {
+                    // Pop last element from collaterals list
+                    let last_collateral = self.collaterals.pop().unwrap();
+
+                    // If collateral address isn't last element, overwrite with popped element
+                    if (i < (self.collaterals.len() - 1)) {
+                        self.collaterals.at(i).write(last_collateral);
+                    }
+
+                    self.emit(CollateralRemoved { caller: get_caller_address(), asset });
+
+                    return;
+                }
+            };
+        }
 
         /// Check if an asset is supported as collateral
         fn is_supported_asset(self: @ContractState, asset: ContractAddress) -> bool {
@@ -142,8 +172,15 @@ pub mod MaunaCore {
         }
 
         /// Get the list of supported collateral assets
-        fn get_supported_collaterals(self: @ContractState) -> Array<ContractAddress> {
-            ArrayTrait::new()
+        fn get_supported_assets(self: @ContractState) -> Array<ContractAddress> {
+            let mut collaterals = ArrayTrait::new();
+
+            for i in 0..self.collaterals.len() {
+                let asset = self.collaterals.at(i).read();
+                collaterals.append(asset)
+            }
+
+            collaterals
         }
     }
 

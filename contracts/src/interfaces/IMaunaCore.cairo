@@ -8,5 +8,5 @@ pub trait IMaunaCore<TContractState> {
     fn add_supported_asset(ref self: TContractState, asset: ContractAddress);
     fn remove_supported_asset(ref self: TContractState, asset: ContractAddress);
     fn is_supported_asset(self: @TContractState, asset: ContractAddress) -> bool;
-    fn get_supported_collaterals(self: @TContractState) -> Array<ContractAddress>;
+    fn get_supported_assets(self: @TContractState) -> Array<ContractAddress>;
 }
