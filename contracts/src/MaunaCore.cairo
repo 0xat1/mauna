@@ -18,17 +18,15 @@ pub mod MaunaCore {
         TokensMinted: TokensMinted,
         /// Emitted when USDm tokens are redeemed
         TokensRedeemed: TokensRedeemed,
+        /// Emitted when a collateral asset is added to the whitelist
+        CollateralAdded: CollateralAdded,
         /// Emitted when a collateral asset is removed from the whitelist
         CollateralRemoved: CollateralRemoved,
-        /// Emitted when a validator address is removed
-        CollateralAdded: CollateralAdded,
     }
 
     #[derive(Drop, starknet::Event)]
     pub struct TokensMinted {
         pub caller: ContractAddress,
-        pub benefactor: ContractAddress,
-        pub beneficiary: ContractAddress,
         pub collateral_asset: ContractAddress,
         pub collateral_amount: u256,
         pub usdm_amount: u256,
@@ -37,17 +35,9 @@ pub mod MaunaCore {
     #[derive(Drop, starknet::Event)]
     pub struct TokensRedeemed {
         pub caller: ContractAddress,
-        pub benefactor: ContractAddress,
-        pub beneficiary: ContractAddress,
         pub collateral_asset: ContractAddress,
         pub collateral_amount: u256,
         pub usdm_amount: u256,
-    }
-
-    #[derive(Drop, starknet::Event)]
-    pub struct CollateralRemoved {
-        caller: ContractAddress,
-        asset: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -56,10 +46,14 @@ pub mod MaunaCore {
         pub asset: ContractAddress,
     }
 
+    #[derive(Drop, starknet::Event)]
+    pub struct CollateralRemoved {
+        pub caller: ContractAddress,
+        pub asset: ContractAddress,
+    }
+
     #[derive(Copy, Drop, Serde)]
     pub struct Order {
-        pub benefactor: ContractAddress,
-        pub beneficiary: ContractAddress,
         pub collateral: ContractAddress,
         pub amount_in: u256,
         pub min_amount_out: u256,
@@ -102,35 +96,34 @@ pub mod MaunaCore {
 
             // TODO: Verify amount_out >= min_amount_out before transfering collateral
 
+            let caller = get_caller_address();
             let contract = get_contract_address();
             let usdm = self.usdm.read();
 
-            // Ensure benefactor has enough collateral
+            // Ensure caller has enough collateral
             let balance = IERC20Dispatcher { contract_address: order.collateral }
-                .balance_of(order.benefactor);
+                .balance_of(caller);
             assert(balance >= order.amount_in, errors::INSUFFICIENT_BALANCE);
 
-            // Ensure contract is approved to pull collateral
+            // Ensure caller is approved to pull collateral
             let allowance = IERC20Dispatcher { contract_address: order.collateral }
-                .allowance(order.benefactor, contract);
+                .allowance(caller, contract);
             assert(allowance >= order.amount_in, errors::INSUFFICIENT_ALLOWANCE);
 
             // Transfer collateral
             let success = IERC20Dispatcher { contract_address: order.collateral }
-                .transfer_from(order.benefactor, contract, order.amount_in);
+                .transfer_from(caller, contract, order.amount_in);
             assert(success, errors::TRANSFER_FAILED);
 
-            // Mint USDm to the beneficiary
+            // Mint USDm to the caller
             let usdm_amount = order.min_amount_out; // TODO
-            IUSDmDispatcher { contract_address: usdm }.mint(order.beneficiary, usdm_amount);
+            IUSDmDispatcher { contract_address: usdm }.mint(caller, usdm_amount);
 
             // Emit a TokensMinted event
             self
                 .emit(
                     TokensMinted {
                         caller: get_caller_address(),
-                        benefactor: order.benefactor,
-                        beneficiary: order.beneficiary,
                         collateral_asset: order.collateral,
                         collateral_amount: order.amount_in,
                         usdm_amount: order.min_amount_out,
@@ -146,25 +139,25 @@ pub mod MaunaCore {
             // TODO: Verify amount_out <= min_amount_out before burning the USDm tokens
             // TODO: Verify contract have enough collateral to send before burning
 
+            let caller = get_caller_address();
             let contract = get_contract_address();
             let usdm = self.usdm.read();
 
-            // Ensure benefactor has enough USDm
-            let balance = IERC20Dispatcher { contract_address: usdm }.balance_of(order.benefactor);
+            // Ensure caller has enough USDm
+            let balance = IERC20Dispatcher { contract_address: usdm }.balance_of(caller);
             assert(balance >= order.amount_in, errors::INSUFFICIENT_BALANCE);
 
             // Check allowance
-            let allowance = IERC20Dispatcher { contract_address: usdm }
-                .allowance(order.benefactor, contract);
+            let allowance = IERC20Dispatcher { contract_address: usdm }.allowance(caller, contract);
             assert(allowance >= order.amount_in, errors::INSUFFICIENT_ALLOWANCE);
 
-            // Burn beneficiary USDm tokens
-            IUSDmDispatcher { contract_address: usdm }.burn(order.beneficiary, order.amount_in);
+            // Burn caller USDm tokens
+            IUSDmDispatcher { contract_address: usdm }.burn(caller, order.amount_in);
 
-            // Redeem collateral tokens to beneficiary
+            // Redeem collateral tokens to caller
             let amount_out = order.min_amount_out;
             let success = IERC20Dispatcher { contract_address: order.collateral }
-                .transfer(order.beneficiary, amount_out);
+                .transfer(caller, amount_out);
             assert(success, errors::TRANSFER_FAILED);
 
             // Emit a TokensRedeemed event
@@ -172,8 +165,6 @@ pub mod MaunaCore {
                 .emit(
                     TokensRedeemed {
                         caller: get_caller_address(),
-                        benefactor: order.benefactor,
-                        beneficiary: order.beneficiary,
                         collateral_asset: order.collateral,
                         collateral_amount: order.amount_in,
                         usdm_amount: order.min_amount_out,
@@ -183,6 +174,7 @@ pub mod MaunaCore {
 
         /// Add a new collateral asset
         fn add_supported_asset(ref self: ContractState, asset: ContractAddress) {
+            // TODO: Access-control check
             // Verify asset address is not zero
             assert(asset.is_non_zero(), errors::ZERO_TOKEN_ADDRESS);
             // Verify asset is not already supported as collateral
@@ -197,10 +189,11 @@ pub mod MaunaCore {
 
         /// Remove a supported collateral
         fn remove_supported_asset(ref self: ContractState, asset: ContractAddress) {
+            // TODO: Access-control check
             // Verify asset address is not zero
             assert(asset.is_non_zero(), errors::ZERO_TOKEN_ADDRESS);
             // Verify asset is supported as collateral
-            assert(self.supported_collaterals.entry(asset).read(), 'Asset not supperted');
+            assert(self.supported_collaterals.entry(asset).read(), errors::ASSET_NOT_SUPPORTED);
 
             for i in 0..self.collaterals.len() {
                 if (self.collaterals.at(i).read() == asset) {
@@ -241,10 +234,6 @@ pub mod MaunaCore {
     impl Internal of InternalTrait {
         /// Validate basic fields of an Order struct
         fn _validate_order(self: @ContractState, order: Order) {
-            // Benefactor must be non-zero
-            assert(order.benefactor.is_non_zero(), errors::ZERO_TOKEN_ADDRESS);
-            // Beneficiary must be non-zero
-            assert(order.beneficiary.is_non_zero(), errors::ZERO_TOKEN_ADDRESS);
             // Collateral address must be non-zero
             assert(order.collateral.is_non_zero(), errors::ZERO_TOKEN_ADDRESS);
             // Collateral must be whitelisted

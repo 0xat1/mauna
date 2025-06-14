@@ -25,13 +25,7 @@ fn test_mint_success() {
     set_balance(user, collateral_amount, token);
 
     // Init order
-    let order = Order {
-        benefactor: user,
-        beneficiary: user,
-        collateral,
-        amount_in: collateral_amount,
-        min_amount_out: usdm_amount,
-    };
+    let order = Order { collateral, amount_in: collateral_amount, min_amount_out: usdm_amount };
 
     // Approve MaunaCore to spend collateral
     start_cheat_caller_address(collateral, user);
@@ -57,8 +51,6 @@ fn test_mint_success() {
     let event = Event::TokensMinted(
         TokensMinted {
             caller: user,
-            benefactor: user,
-            beneficiary: user,
             collateral_asset: collateral,
             collateral_amount: collateral_amount,
             usdm_amount: usdm_amount,
@@ -88,8 +80,6 @@ fn test_mint_non_supported_collateral() {
 
     // Init order
     let order = Order {
-        benefactor: user,
-        beneficiary: user,
         collateral: unsupported_collateral,
         amount_in: collateral_amount,
         min_amount_out: usdm_amount,
@@ -105,26 +95,21 @@ fn test_mint_non_supported_collateral() {
     IMaunaCoreDispatcher { contract_address: mauna }.mint(order);
     stop_cheat_caller_address(mauna);
 }
-// #[test]
-// fn test_mint_zero_benefactor() {}
 
 // #[test]
-// fn test_mint_zero_beneficiary() {}
-
-// #[test]
-// fn test_mint_zero_collateral() {}
+// fn test_mint_zero_collateral_address() {}
 
 // #[test]
 // fn test_mint_zero_collateral_amount() {}
 
 // #[test]
-// fn test_mint_insufficient_balance_panics() {}
+// fn test_mint_insufficient_balance() {}
 
 // #[test]
-// fn test_mint_insufficient_allowance_panics() {}
+// fn test_mint_insufficient_allowance() {}
 
 // #[test]
-// fn test_mint_slippage_exceeded_panics() {}
+// fn test_mint_slippage_exceeded() {}
 
 #[test]
 fn test_redeem_success() {}
