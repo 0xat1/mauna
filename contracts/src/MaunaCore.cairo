@@ -5,6 +5,8 @@ pub mod MaunaCore {
     use mauna::interfaces::IUSDm::{IUSDmDispatcher, IUSDmDispatcherTrait};
     use mauna::utils::errors;
     use openzeppelin_token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use pragma_lib::abi::{IPragmaABIDispatcher, IPragmaABIDispatcherTrait};
+    use pragma_lib::types::{DataType, PragmaPricesResponse};
     use starknet::storage::{
         Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
         Vec, VecTrait,
@@ -67,6 +69,8 @@ pub mod MaunaCore {
         supported_collaterals: Map<ContractAddress, bool>,
         /// List of all whitelisted collateral addresses
         collaterals: Vec<ContractAddress>,
+        /// Address of the pragma oracle contract
+        pub pragma_contract: ContractAddress,
     }
 
     #[constructor]
@@ -75,6 +79,7 @@ pub mod MaunaCore {
         admin: ContractAddress,
         usdm: ContractAddress,
         default_collaterals: Array<ContractAddress>,
+        pragma_contract: ContractAddress,
     ) {
         // Store the USDm token address
         self.usdm.write(usdm);
@@ -84,7 +89,10 @@ pub mod MaunaCore {
         // Register each initial supported collateral asset
         for default_collateral in default_collaterals {
             self.add_supported_asset(default_collateral);
-        };
+        }
+
+        // Save address of the pragma contract
+        self.pragma_contract.write(pragma_contract);
     }
 
     #[abi(embed_v0)]
@@ -94,11 +102,11 @@ pub mod MaunaCore {
             // Verify order parameters
             self._validate_order(order);
 
-            // TODO: Verify amount_out >= min_amount_out before transfering collateral
-
             let caller = get_caller_address();
             let contract = get_contract_address();
             let usdm = self.usdm.read();
+
+            // TODO: Verify amount_out >= min_amount_out before transfering collateral
 
             // Ensure caller has enough collateral
             let balance = IERC20Dispatcher { contract_address: order.collateral }
@@ -231,7 +239,7 @@ pub mod MaunaCore {
     }
 
     #[generate_trait]
-    impl Internal of InternalTrait {
+    pub impl Internal of InternalTrait {
         /// Validate basic fields of an Order struct
         fn _validate_order(self: @ContractState, order: Order) {
             // Collateral address must be non-zero
@@ -240,6 +248,20 @@ pub mod MaunaCore {
             assert(self.is_supported_asset(order.collateral), errors::ASSET_NOT_SUPPORTED);
             // Deposit amount must be non-zero
             assert(order.amount_in > 0, errors::ZERO_TOKEN_AMOUNT);
+        }
+
+        /// Retrieve spot price and decimals from the Pragma oracle for a given asset ID
+        fn _get_asset_price(self: @ContractState, asset_id: felt252) -> (u128, u32) {
+            // Read the Pragma oracle address from storage
+            let oracle_dispatcher = IPragmaABIDispatcher {
+                contract_address: self.pragma_contract.read(),
+            };
+
+            // Fetch the spot price and decimals for the asset
+            let output: PragmaPricesResponse = oracle_dispatcher
+                .get_data_median(DataType::SpotEntry(asset_id));
+
+            (output.price, output.decimals)
         }
     }
 }

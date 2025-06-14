@@ -8,6 +8,7 @@ dependencies = [
  "openzeppelin_access",
  "openzeppelin_introspection",
  "openzeppelin_token",
+ "pragma_lib",
  "snforge_std",
 ]
 
@@ -54,6 +55,11 @@ name = "openzeppelin_utils"
 version = "1.0.0"
 source = "registry+https://scarbs.xyz/"
 checksum = "sha256:fd348b31c4a4407add33adc3c2b8f26dca71dbd7431faaf726168f37a91db0c1"
+
+[[package]]
+name = "pragma_lib"
+version = "1.0.0"
+source = "git+https://github.com/astraly-labs/pragma-lib?tag=2.9.1#ee1f3f7e9276cf64e19e267832de380d84c04d28"
 
 [[package]]
 name = "snforge_scarb_plugin"

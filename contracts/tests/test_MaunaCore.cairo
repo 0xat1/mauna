@@ -1,4 +1,5 @@
-use mauna::MaunaCore::MaunaCore::{Event, Order, TokensMinted};
+use mauna::MaunaCore::MaunaCore;
+use mauna::MaunaCore::MaunaCore::{Event, InternalTrait, Order, TokensMinted};
 use mauna::interfaces::IMaunaCore::{IMaunaCoreDispatcher, IMaunaCoreDispatcherTrait};
 use openzeppelin_token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use snforge_std::{
@@ -6,7 +7,10 @@ use snforge_std::{
     start_cheat_caller_address, stop_cheat_caller_address,
 };
 use starknet::ContractAddress;
-use super::utils::{deploy_mock_erc20, setup};
+use starknet::storage::StoragePointerWriteAccess;
+use super::utils::{PRAGMA_SEPOLIA, deploy_mock_erc20, setup};
+
+/// TEST MINT FUNTION
 
 #[test]
 fn test_mint_success() {
@@ -97,12 +101,6 @@ fn test_mint_non_supported_collateral() {
 }
 
 // #[test]
-// fn test_mint_zero_collateral_address() {}
-
-// #[test]
-// fn test_mint_zero_collateral_amount() {}
-
-// #[test]
 // fn test_mint_insufficient_balance() {}
 
 // #[test]
@@ -111,5 +109,35 @@ fn test_mint_non_supported_collateral() {
 // #[test]
 // fn test_mint_slippage_exceeded() {}
 
+// #[test]
+// fn test_mint_zero_collateral_address() {}
+
+// #[test]
+// fn test_mint_zero_collateral_amount() {}
+
+/// TEST REDEEM FUNCTION
+
+// #[test]
+// fn test_redeem_success() {}
+
+/// TEST GET ASSET PRICE
+
 #[test]
-fn test_redeem_success() {}
+#[fork(url: "https://starknet-sepolia.public.blastapi.io/rpc/v0_8", block_number: 856892)]
+fn test_get_asset_price_and_decimals() {
+    // Set up contract state for testing
+    let mut state = MaunaCore::contract_state_for_testing();
+
+    // Configure Pragma oracle
+    state.pragma_contract.write(PRAGMA_SEPOLIA);
+
+    // Query price and decimals for the asset_id
+    let asset_id = 6004514686061859652;
+    let (price, decimals) = state._get_asset_price(asset_id);
+
+    // Verify decimals returned by the oracle
+    assert(decimals == 8, 'Invalid token decimals');
+
+    // Verify price returned by the oracle
+    assert(price == 11_802_075, 'Invalid token price');
+}

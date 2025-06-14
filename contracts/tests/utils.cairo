@@ -10,6 +10,15 @@ use starknet::ContractAddress;
 
 pub const ADMIN: ContractAddress = 'admin'.try_into().unwrap();
 
+pub const PRAGMA_SEPOLIA: ContractAddress =
+    0x36031daa264c24520b11d93af622c848b2499b66b41d611bac95e13cfca131a
+    .try_into()
+    .unwrap();
+pub const PRAGMA_MAINNET: ContractAddress =
+    0x2a85bd616f912537c50a49a4076db02c00b29b2cdc8a197ce92ed1837fa875b
+    .try_into()
+    .unwrap();
+
 fn deploy_contract(name: ByteArray, calldata: Array<felt252>) -> ContractAddress {
     let contract = declare(name).unwrap().contract_class();
     let (contract_address, _) = contract.deploy(@calldata).unwrap();
@@ -36,6 +45,7 @@ pub fn deploy_mauna_core(
     ADMIN.serialize(ref calldata);
     usdm.serialize(ref calldata);
     collaterals.serialize(ref calldata);
+    PRAGMA_SEPOLIA.serialize(ref calldata);
 
     deploy_contract("MaunaCore", calldata)
 }
