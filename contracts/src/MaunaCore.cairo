@@ -16,7 +16,9 @@ pub mod MaunaCore {
     pub enum Event {
         /// Emitted when USDm tokens are minted
         TokensMinted: TokensMinted,
-        /// Emitted when a collateral asset is added to the whitelist
+        /// Emitted when USDm tokens are redeemed
+        TokensRedeemed: TokensRedeemed,
+        /// Emitted when a collateral asset is removed from the whitelist
         CollateralRemoved: CollateralRemoved,
         /// Emitted when a validator address is removed
         CollateralAdded: CollateralAdded,
@@ -24,6 +26,16 @@ pub mod MaunaCore {
 
     #[derive(Drop, starknet::Event)]
     pub struct TokensMinted {
+        pub caller: ContractAddress,
+        pub benefactor: ContractAddress,
+        pub beneficiary: ContractAddress,
+        pub collateral_asset: ContractAddress,
+        pub collateral_amount: u256,
+        pub usdm_amount: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct TokensRedeemed {
         pub caller: ContractAddress,
         pub benefactor: ContractAddress,
         pub beneficiary: ContractAddress,
@@ -85,11 +97,13 @@ pub mod MaunaCore {
     pub impl MaunaCore of IMaunaCore<ContractState> {
         /// Mint USDm tokens for a supported collateral
         fn mint(ref self: ContractState, order: Order) {
-            let caller = get_caller_address();
-            let contract = get_contract_address();
-
             // Verify order parameters
             self._validate_order(order);
+
+            // TODO: Verify amount_out >= min_amount_out before transfering collateral
+
+            let contract = get_contract_address();
+            let usdm = self.usdm.read();
 
             // Ensure benefactor has enough collateral
             let balance = IERC20Dispatcher { contract_address: order.collateral }
@@ -107,7 +121,6 @@ pub mod MaunaCore {
             assert(success, errors::TRANSFER_FAILED);
 
             // Mint USDm to the beneficiary
-            let usdm = self.usdm.read();
             let usdm_amount = order.min_amount_out; // TODO
             IUSDmDispatcher { contract_address: usdm }.mint(order.beneficiary, usdm_amount);
 
@@ -115,7 +128,7 @@ pub mod MaunaCore {
             self
                 .emit(
                     TokensMinted {
-                        caller,
+                        caller: get_caller_address(),
                         benefactor: order.benefactor,
                         beneficiary: order.beneficiary,
                         collateral_asset: order.collateral,
@@ -126,7 +139,47 @@ pub mod MaunaCore {
         }
 
         /// Redeem USDm tokens for a supported collateral
-        fn redeem(ref self: ContractState, order: Order) {}
+        fn redeem(ref self: ContractState, order: Order) {
+            // Verify order parameters
+            self._validate_order(order);
+
+            // TODO: Verify amount_out <= min_amount_out before burning the USDm tokens
+            // TODO: Verify contract have enough collateral to send before burning
+
+            let contract = get_contract_address();
+            let usdm = self.usdm.read();
+
+            // Ensure benefactor has enough USDm
+            let balance = IERC20Dispatcher { contract_address: usdm }.balance_of(order.benefactor);
+            assert(balance >= order.amount_in, errors::INSUFFICIENT_BALANCE);
+
+            // Check allowance
+            let allowance = IERC20Dispatcher { contract_address: usdm }
+                .allowance(order.benefactor, contract);
+            assert(allowance >= order.amount_in, errors::INSUFFICIENT_ALLOWANCE);
+
+            // Burn beneficiary USDm tokens
+            IUSDmDispatcher { contract_address: usdm }.burn(order.beneficiary, order.amount_in);
+
+            // Redeem collateral tokens to beneficiary
+            let amount_out = order.min_amount_out;
+            let success = IERC20Dispatcher { contract_address: order.collateral }
+                .transfer(order.beneficiary, amount_out);
+            assert(success, errors::TRANSFER_FAILED);
+
+            // Emit a TokensRedeemed event
+            self
+                .emit(
+                    TokensRedeemed {
+                        caller: get_caller_address(),
+                        benefactor: order.benefactor,
+                        beneficiary: order.beneficiary,
+                        collateral_asset: order.collateral,
+                        collateral_amount: order.amount_in,
+                        usdm_amount: order.min_amount_out,
+                    },
+                );
+        }
 
         /// Add a new collateral asset
         fn add_supported_asset(ref self: ContractState, asset: ContractAddress) {

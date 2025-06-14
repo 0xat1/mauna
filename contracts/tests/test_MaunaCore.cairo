@@ -126,4 +126,5 @@ fn test_mint_non_supported_collateral() {
 // #[test]
 // fn test_mint_slippage_exceeded_panics() {}
 
-
+#[test]
+fn test_redeem_success() {}
